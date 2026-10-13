@@ -40,11 +40,15 @@ async () => {
   let sc = pl.querySelector('[data-testid="tracklist-row"]');
   while (sc && !(sc.scrollHeight > sc.clientHeight + 50 && /(auto|scroll)/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
   if (!sc) sc = document.scrollingElement;
+  // Spotify loads rows in chunks and sometimes stalls. Keep going until every
+  // row is read; when nothing new arrives, nudge the list up and back down.
   let last = -1, stable = 0;
-  for (let i = 0; i < 600 && stable < 8; i++) {
+  for (let i = 0; i < 1500 && stable < 40; i++) {
     grab();
+    if (expected > 0 && Object.keys(found).length >= expected) break;
+    if (stable && stable % 6 === 0) { sc.scrollTop -= 1500; await new Promise(r => setTimeout(r, 600)); }
     sc.scrollTop += 600;
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, stable ? 700 : 400));
     const n = Object.keys(found).length;
     if (n === last) stable++; else { stable = 0; last = n; }
   }
@@ -82,6 +86,17 @@ def diagnose(page, why):
 
 
 def main():
+    for attempt in (1, 2):
+        try:
+            return read_once()
+        except SystemExit as e:
+            if attempt == 2:
+                raise
+            print(f"Attempt {attempt} failed ({e}); trying again in a minute.", flush=True)
+            time.sleep(60)
+
+
+def read_once():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page(
@@ -91,11 +106,15 @@ def main():
             locale="en-US",
         )
         page.goto(URL, wait_until="domcontentloaded", timeout=60000)
-        # Decline the cookie banner if one appears.
+        # Decline the cookie banner and close the language picker if they appear.
         try:
             page.locator("#onetrust-reject-all-handler").click(timeout=5000)
         except Exception:
             pass
+        try:
+            page.locator('[data-testid="language-selection-modal"] [data-testid="close-button"]').click(timeout=3000)
+        except Exception:
+            page.keyboard.press("Escape")
         try:
             page.wait_for_selector('[data-testid="playlist-tracklist"] [data-testid="tracklist-row"]', timeout=60000)
         except Exception as e:
