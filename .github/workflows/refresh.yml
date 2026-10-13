@@ -14,7 +14,6 @@ on:
 
 permissions:
   contents: write   # save new tags back to the repo
-  models: read      # free GitHub Models access for tagging
   pages: write
   id-token: write
 
@@ -44,8 +43,9 @@ jobs:
 
       - name: Tag new tracks
         if: github.event_name != 'push'
+        continue-on-error: true      # untagged songs still show up; the next run retries
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python scripts/tag.py
 
       - name: Find new songs on YouTube
@@ -72,7 +72,11 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data
           git commit -m "Refresh playlist data" || echo "Nothing new"
-          git push
+          # Someone may have pushed while this ran; fold their changes in and retry.
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && break
+            sleep 10
+          done
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

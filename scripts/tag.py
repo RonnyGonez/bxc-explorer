@@ -1,7 +1,8 @@
 """Tag new playlist tracks with energy, mood, danceability and genre.
 
-Uses GitHub Models (free with the workflow's own GITHUB_TOKEN, no API key or
-billing). Only tracks not already in data/tracks.json are sent. Existing tags
+Uses Google's Gemini API on its free tier (GEMINI_API_KEY secret from
+aistudio.google.com; no billing needed). GitHub Models, used before, was shut
+down on 30 July 2026. Only tracks not already in data/tracks.json are sent. Existing tags
 are used as worked examples so new tags follow the same scale.
 
 If the model can't be reached, new tracks are still added but marked pending:
@@ -19,9 +20,9 @@ HERE = os.path.dirname(__file__)
 DATA = os.path.join(HERE, "..", "data")
 TRACKS = os.path.join(DATA, "tracks.json")
 PLAYLIST = os.path.join(DATA, "playlist.json")
-ENDPOINT = os.environ.get("MODELS_ENDPOINT", "https://models.github.ai/inference/chat/completions")
-MODEL = os.environ.get("MODEL", "openai/gpt-4.1-mini")
-TOKEN = os.environ.get("GITHUB_TOKEN", "")
+ENDPOINT = os.environ.get("MODELS_ENDPOINT", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")
+MODEL = os.environ.get("MODEL", "gemini-2.5-flash")
+TOKEN = os.environ.get("GEMINI_API_KEY", "")
 BATCH = 20
 
 GENRES = {
@@ -94,6 +95,8 @@ def main():
     print(f"{len(todo)} tracks need tagging")
     if not todo:
         return
+    if not TOKEN:
+        print("::warning title=Tagging skipped::No GEMINI_API_KEY secret set, so new songs stay untagged for now.")
     tagged_examples = [t for t in tracks if not t.get("pending") and not t["lc"]]
     random.seed(len(tracks))
     for start in range(0, len(todo), BATCH):
