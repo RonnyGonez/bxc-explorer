@@ -2,11 +2,11 @@ name: Refresh playlist explorer
 
 on:
   schedule:
-    # Once a day, aimed at 3:07 UTC (4:07am UK in summer, 3:07am in winter).
-    # GitHub often starts scheduled runs hours late; that's fine, it just runs
-    # whenever it gets there. Don't add a time-of-day check here: a late start
-    # would make it skip the day entirely.
-    - cron: "7 3 * * *"
+    # Once a day, scheduled for 21:07 UTC (10pm UK in summer, 9pm in winter).
+    # GitHub has been starting scheduled runs 6-7 hours late, so this usually
+    # lands overnight, before people in London are up. Don't add a time-of-day
+    # check here: a late start would make it skip the day entirely.
+    - cron: "7 21 * * *"
   workflow_dispatch:           # adds a "Run workflow" button for a manual refresh
   push:
     branches: [main]
