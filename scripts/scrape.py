@@ -54,6 +54,33 @@ async () => {
 """
 
 
+def annotate(title, msg):
+    """Show a message as a GitHub Actions annotation (readable without the full log)."""
+    msg = str(msg).replace("%", "%25").replace("\r", "").replace("\n", "%0A")[:3000]
+    print(f"::error title={title}::{msg}", flush=True)
+
+
+DIAG_JS = r"""
+() => ({
+  url: location.href,
+  title: document.title,
+  tracklist: !!document.querySelector('[data-testid="playlist-tracklist"]'),
+  rows: document.querySelectorAll('[data-testid="tracklist-row"]').length,
+  rowcount: (document.querySelector('[aria-rowcount]') || {getAttribute: () => null}).getAttribute('aria-rowcount'),
+  testids: [...new Set([...document.querySelectorAll('[data-testid]')].map(e => e.dataset.testid))].slice(0, 60).join(','),
+  text: (document.body ? document.body.innerText : '').replace(/\s+/g, ' ').slice(0, 700),
+})
+"""
+
+
+def diagnose(page, why):
+    try:
+        d = page.evaluate(DIAG_JS)
+    except Exception as e:
+        d = {"diag_error": str(e)}
+    annotate("Playlist read failed", f"{why}\n" + "\n".join(f"{k}: {v}" for k, v in d.items()))
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -69,9 +96,16 @@ def main():
             page.locator("#onetrust-reject-all-handler").click(timeout=5000)
         except Exception:
             pass
-        page.wait_for_selector('[data-testid="playlist-tracklist"] [data-testid="tracklist-row"]', timeout=60000)
+        try:
+            page.wait_for_selector('[data-testid="playlist-tracklist"] [data-testid="tracklist-row"]', timeout=60000)
+        except Exception as e:
+            diagnose(page, f"Track rows never appeared ({type(e).__name__})")
+            browser.close()
+            sys.exit("Scrape failed: track rows never appeared")
         time.sleep(2)
         result = page.evaluate(COLLECT_JS)
+        if "error" in result or len(result.get("rows", [])) < result.get("expected", 0) * 0.97:
+            diagnose(page, f"After scrolling: {result.get('error') or str(len(result['rows'])) + ' of ' + str(result['expected']) + ' rows read'}")
         browser.close()
 
     if "error" in result:
@@ -86,6 +120,7 @@ def main():
         tracks.append({"id": r["id"], "title": r["title"], "artists": r["artists"], "album": r["album"]})
     print(f"Read {len(rows)} rows ({len(tracks)} unique) of {expected} expected")
     if expected <= 0 or len(rows) < expected * 0.97:
+        annotate("Playlist read incomplete", f"Only read {len(rows)} of {expected} rows; first idx {rows[0]['idx'] if rows else None}, last idx {rows[-1]['idx'] if rows else None}")
         sys.exit(f"Only read {len(rows)} of {expected} rows; keeping the previous data.")
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump({"playlist_id": PLAYLIST_ID, "count": len(rows), "tracks": tracks}, f, ensure_ascii=False, indent=1)
