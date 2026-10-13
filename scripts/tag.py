@@ -101,7 +101,15 @@ def main():
                     result = {o.get("id"): o for o in out if isinstance(o, dict)}
                     break
                 except Exception as e:
-                    print(f"Model call failed (attempt {attempt + 1}): {e}", file=sys.stderr)
+                    detail = str(e)
+                    if hasattr(e, "read"):
+                        try:
+                            detail += " " + e.read().decode("utf-8", "replace")[:400]
+                        except Exception:
+                            pass
+                    print(f"Model call failed (attempt {attempt + 1}): {detail}", file=sys.stderr)
+                    if attempt == 2:
+                        print("::warning title=Tagging failed::" + detail.replace("\n", " ")[:600], flush=True)
                     time.sleep(10 * (attempt + 1))
         for p in batch:
             o = result.get(p["id"])
