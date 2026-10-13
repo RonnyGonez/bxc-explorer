@@ -2,11 +2,11 @@ name: Refresh playlist explorer
 
 on:
   schedule:
-    # Daily at 4:07am UK time. GitHub schedules run in UTC and the UK shifts
-    # between GMT and BST, so both slots fire and the gate below keeps the one
-    # that is 4am in London.
+    # Once a day, aimed at 3:07 UTC (4:07am UK in summer, 3:07am in winter).
+    # GitHub often starts scheduled runs hours late; that's fine, it just runs
+    # whenever it gets there. Don't add a time-of-day check here: a late start
+    # would make it skip the day entirely.
     - cron: "7 3 * * *"
-    - cron: "7 4 * * *"
   workflow_dispatch:           # adds a "Run workflow" button for a manual refresh
   push:
     branches: [main]
@@ -23,22 +23,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  gate:
-    runs-on: ubuntu-latest
-    outputs:
-      run: ${{ steps.check.outputs.run }}
-    steps:
-      - id: check
-        run: |
-          if [ "${{ github.event_name }}" != "schedule" ] || [ "$(TZ=Europe/London date +%H)" = "04" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
-
   refresh:
-    needs: gate
-    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

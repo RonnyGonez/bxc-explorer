@@ -583,7 +583,7 @@ async function readFile(f){
 async function title(id){
   try{const r=await fetch("https://open.spotify.com/oembed?url=https://open.spotify.com/track/"+id);if(!r.ok)return null;const j=await r.json();return j.title||null}catch(e){return null}
 }
-// Songs copied/added from here recently: the playlist data only refreshes at 4am, so remember
+// Songs copied/added from here recently: the playlist data only refreshes once a day, so remember
 // them for a few days to stop the same songs being offered (and pasted) twice.
 const RECENT_KEY="bxc-copied",RECENT_DAYS=4;
 function recentGet(){let r={};try{r=JSON.parse(localStorage.getItem(RECENT_KEY)||"{}")}catch(e){}
@@ -608,7 +608,7 @@ async function runCatch(f){
   let h=`<div class="bar" style="border-top:none;padding-top:0"><div class="count">${missing.length} missing<small>${total} Spotify songs shared in this export · ${total-notIn.length} already in the playlist</small></div>`;
   if(missing.length)h+=`<div class="btns">${SPOTIFY_CLIENT_ID?`<button class="btn primary" id="addMissing" type="button">Add all ${missing.length} to the playlist</button>`:""}<button class="btn${SPOTIFY_CLIENT_ID?"":" primary"}" id="copyMissing" type="button">Copy all missing links</button></div><p class="sub" id="addStatus" hidden></p>`;
   h+=`</div>`;
-  if(skippedRecent)h+=`<p class="hint" style="margin:0">${skippedRecent} ${skippedRecent===1?"song was":"songs were"} copied or added from here in the last few days, so ${skippedRecent===1?"it's":"they're"} left out to avoid adding ${skippedRecent===1?"it":"them"} twice. The playlist data catches up at the 4am refresh.</p>`;
+  if(skippedRecent)h+=`<p class="hint" style="margin:0">${skippedRecent} ${skippedRecent===1?"song was":"songs were"} copied or added from here in the last few days, so ${skippedRecent===1?"it's":"they're"} left out to avoid adding ${skippedRecent===1?"it":"them"} twice. The playlist data catches up at the next daily refresh.</p>`;
   if(missing.length){
     h+=`<p class="hint" style="margin:0" id="dupNote" hidden></p><p class="hint" style="margin:0">${SPOTIFY_CLIENT_ID?"Tap Add all to put them in the playlist. You'll be asked to sign in to Spotify the first time.":"On a computer, paste the copied links into the playlist in the Spotify app."}</p><ul class="mlist" id="mlist">`+missing.map(m=>`<li data-id="${m.id}"><span class="mt">Loading title…</span><span class="md">Shared ${esc(m.date||"")}</span><a href="https://open.spotify.com/track/${m.id}" target="_blank" rel="noopener">Spotify ↗</a></li>`).join("")+`</ul>`;
   }
@@ -698,7 +698,7 @@ async function addToPlaylist(ids){
     added+=uris.length;
   }
   ids.forEach(id=>INPL.add(id));
-  status(`Added ${added} songs to the playlist. They'll show up in the explorer after tomorrow morning's refresh.`);
+  status(`Added ${added} songs to the playlist. They'll show up in the explorer after the next daily refresh.`);
   toast(`Added ${added} songs`);
 }
 async function swapCode(code,fail){
