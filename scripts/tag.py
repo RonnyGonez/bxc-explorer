@@ -69,7 +69,12 @@ def ask(batch, examples):
     req = urllib.request.Request(ENDPOINT, data=json.dumps(body).encode(), method="POST", headers={
         "Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json", "Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=120) as r:
-        content = json.load(r)["choices"][0]["message"]["content"]
+        raw = r.read().decode("utf-8", "replace")
+        info = f"HTTP {r.status} {r.headers.get('Content-Type')} from {r.geturl()}"
+    try:
+        content = json.loads(raw)["choices"][0]["message"]["content"]
+    except Exception as e:
+        raise RuntimeError(f"{info}; couldn't read reply ({e}); body starts: {raw[:300]!r}")
     m = re.search(r"\{.*\}", content, re.S)
     return json.loads(m.group(0))["tracks"]
 
