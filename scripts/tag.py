@@ -90,6 +90,7 @@ def clamp(x, lo=1, hi=5):
 def self_check(tracks):
     """Nothing new to tag: re-tag one known song (not saved) to prove the key works."""
     if not TOKEN:
+        print("::warning title=Tagging check::No GEMINI_API_KEY secret reached this run, so new songs won't be tagged automatically.")
         return
     known = [t for t in tracks if not t.get("pending") and not t["lc"]]
     probe = random.choice(known)
