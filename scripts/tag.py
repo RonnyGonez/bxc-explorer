@@ -63,15 +63,20 @@ def clean_title(t):
 
 def ask(batch, examples):
     last = None
-    while MODELS:
+    for model in list(MODELS):
         try:
-            return ask_model(MODELS[0], batch, examples)
+            out = ask_model(model, batch, examples)
+            if MODELS[0] != model:      # remember the one that worked for the rest of the run
+                MODELS.remove(model)
+                MODELS.insert(0, model)
+            return out
         except urllib.error.HTTPError as e:
-            if e.code != 404:
+            if e.code not in (404, 429, 500, 503):
                 raise
             last = e
-            print(f"Model {MODELS[0]} not available, trying the next one", file=sys.stderr)
-            MODELS.pop(0)
+            print(f"Model {model} gave HTTP {e.code}, trying the next one", file=sys.stderr)
+            if e.code == 404:
+                MODELS.remove(model)    # retired name: don't try it again
     raise last or RuntimeError("no Gemini model available")
 
 
