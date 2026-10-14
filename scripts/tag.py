@@ -14,6 +14,7 @@ import random
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 
 HERE = os.path.dirname(__file__)
@@ -21,7 +22,8 @@ DATA = os.path.join(HERE, "..", "data")
 TRACKS = os.path.join(DATA, "tracks.json")
 PLAYLIST = os.path.join(DATA, "playlist.json")
 ENDPOINT = os.environ.get("MODELS_ENDPOINT", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")
-MODEL = os.environ.get("MODEL", "gemini-2.5-flash")
+# Tried in order; Google retires model names, so a 404 moves on to the next one.
+MODELS = [m for m in [os.environ.get("MODEL", "")] if m] + ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.5-flash", "gemini-2.5-flash"]
 TOKEN = os.environ.get("GEMINI_API_KEY", "")
 BATCH = 20
 
@@ -60,12 +62,26 @@ def clean_title(t):
 
 
 def ask(batch, examples):
+    last = None
+    while MODELS:
+        try:
+            return ask_model(MODELS[0], batch, examples)
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                raise
+            last = e
+            print(f"Model {MODELS[0]} not available, trying the next one", file=sys.stderr)
+            MODELS.pop(0)
+    raise last or RuntimeError("no Gemini model available")
+
+
+def ask_model(model, batch, examples):
     shots = [{"title": x["t"], "artist": x["a"], "id": x["id"], "year": x["y"], "e": x["e"], "v": x["v"],
               "d": x["d"], "ac": x["ac"], "i": x["i"], "g": x["g"], "lc": x["lc"]} for x in examples]
     user = ("Examples of correctly tagged tracks from this playlist:\n" + json.dumps(shots, ensure_ascii=False) +
             "\n\nTag these tracks the same way:\n" +
             json.dumps([{"id": t["id"], "title": t["title"], "artist": ", ".join(t["artists"]), "album": t["album"]} for t in batch], ensure_ascii=False))
-    body = {"model": MODEL, "temperature": 0.2, "response_format": {"type": "json_object"},
+    body = {"model": model, "temperature": 0.2, "response_format": {"type": "json_object"},
             "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]}
     req = urllib.request.Request(ENDPOINT, data=json.dumps(body).encode(), method="POST", headers={
         "Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json", "Accept": "application/json"})
@@ -97,7 +113,7 @@ def self_check(tracks):
     try:
         out = ask([{"id": probe["id"], "title": probe["t"], "artists": [probe["a"]], "album": ""}], random.sample(known, 8))
         ok = any(o.get("id") == probe["id"] for o in out if isinstance(o, dict))
-        print(f"::notice title=Tagging check::{'Gemini key works' if ok else 'Gemini replied but without usable tags'} (test song: {probe['a']} - {probe['t']})")
+        print(f"::notice title=Tagging check::{'Gemini key works' if ok else 'Gemini replied but without usable tags'} with {MODELS[0]} (test song: {probe['a']} - {probe['t']})")
     except Exception as e:
         detail = str(e) + (" " + e.read().decode("utf-8", "replace")[:300] if hasattr(e, "read") else "")
         print("::warning title=Tagging check failed::" + detail.replace("\n", " ")[:500])
