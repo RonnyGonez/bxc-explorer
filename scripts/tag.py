@@ -87,6 +87,21 @@ def clamp(x, lo=1, hi=5):
         return 3
 
 
+def self_check(tracks):
+    """Nothing new to tag: re-tag one known song (not saved) to prove the key works."""
+    if not TOKEN:
+        return
+    known = [t for t in tracks if not t.get("pending") and not t["lc"]]
+    probe = random.choice(known)
+    try:
+        out = ask([{"id": probe["id"], "title": probe["t"], "artists": [probe["a"]], "album": ""}], random.sample(known, 8))
+        ok = any(o.get("id") == probe["id"] for o in out if isinstance(o, dict))
+        print(f"::notice title=Tagging check::{'Gemini key works' if ok else 'Gemini replied but without usable tags'} (test song: {probe['a']} - {probe['t']})")
+    except Exception as e:
+        detail = str(e) + (" " + e.read().decode("utf-8", "replace")[:300] if hasattr(e, "read") else "")
+        print("::warning title=Tagging check failed::" + detail.replace("\n", " ")[:500])
+
+
 def main():
     tracks = json.load(open(TRACKS, encoding="utf-8"))
     playlist = json.load(open(PLAYLIST, encoding="utf-8"))["tracks"]
@@ -94,6 +109,7 @@ def main():
     todo = [p for p in playlist if p["id"] not in by_id or by_id[p["id"]].get("pending")]
     print(f"{len(todo)} tracks need tagging")
     if not todo:
+        self_check(tracks)
         return
     if not TOKEN:
         print("::warning title=Tagging skipped::No GEMINI_API_KEY secret set, so new songs stay untagged for now.")
