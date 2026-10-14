@@ -62,7 +62,7 @@ def clean_title(t):
 
 
 def ask(batch, examples):
-    last = None
+    last, tried = None, []
     for model in list(MODELS):
         try:
             out = ask_model(model, batch, examples)
@@ -74,10 +74,11 @@ def ask(batch, examples):
             if e.code not in (404, 429, 500, 503):
                 raise
             last = e
+            tried.append(f"{model}: HTTP {e.code}")
             print(f"Model {model} gave HTTP {e.code}, trying the next one", file=sys.stderr)
             if e.code == 404:
                 MODELS.remove(model)    # retired name: don't try it again
-    raise last or RuntimeError("no Gemini model available")
+    raise RuntimeError("no Gemini model answered (" + "; ".join(tried) + ")") if tried else (last or RuntimeError("no Gemini model available"))
 
 
 def ask_model(model, batch, examples):
