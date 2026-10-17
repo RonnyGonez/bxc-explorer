@@ -212,6 +212,8 @@ body.docked .wrap{padding-bottom:200px}
 .mlist .mt{font-weight:700;overflow-wrap:anywhere}
 .mlist .md{font:500 11px/1.3 var(--mono);color:var(--muted);overflow-wrap:anywhere}
 .mlist a{grid-row:1/3;grid-column:2;align-self:center;font:500 11px var(--mono);color:var(--muted)}
+.mlist .md a{grid-row:auto;grid-column:auto;font:inherit;color:inherit;text-decoration:underline}
+.mlist a.osearch{font:700 12px/1.2 var(--body);color:var(--ink);border:1.5px solid var(--ink);border-radius:8px;padding:7px 10px;text-decoration:none;white-space:nowrap}
 .mhead{font:500 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:8px 0 0}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:700;font-size:14px;z-index:5}
 textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px}
@@ -585,7 +587,7 @@ function parseChat(text){
     for(const m of ln.matchAll(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?track\/([A-Za-z0-9]{22})/g)) if(!found.has(m[1]))found.set(m[1],{date,line:ln});
     for(const m of ln.matchAll(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(album|playlist)\/([A-Za-z0-9]{22})/g)){const u=`https://open.spotify.com/${m[1]}/${m[2]}`;if(!albums.has(u))albums.set(u,{date,kind:m[1]})}
     for(const m of ln.matchAll(/https?:\/\/spotify\.link\/[A-Za-z0-9]+/g)) if(!short.has(m[0]))short.set(m[0],{date});
-    for(const m of ln.matchAll(/https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/watch\S+|youtu\.be\/\S+|music\.youtube\.com\/\S+|music\.apple\.com\/\S+|soundcloud\.com\/\S+|[a-z0-9-]+\.bandcamp\.com\/\S+|tidal\.com\/\S+|deezer\.com\/\S+)/g)){const u=m[0].replace(/[).,]+$/,"");if(!other.has(u))other.set(u,{date})}
+    for(const m of ln.matchAll(/https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch|shorts\/)\S+|youtu\.be\/\S+|music\.youtube\.com\/\S+|music\.apple\.com\/\S+|soundcloud\.com\/\S+|[a-z0-9-]+\.bandcamp\.com\/\S+|tidal\.com\/\S+|deezer\.com\/\S+)/g)){const u=m[0].replace(/[).,]+$/,"");if(!other.has(u))other.set(u,{date})}
   }
   return {found,short,other,albums};
 }
@@ -596,6 +598,23 @@ async function readFile(f){
     if(!e)throw new Error("no .txt chat file inside the zip");return e.async("string");
   }
   return f.text();
+}
+const YT_IN_PL=new Set(TRACKS.map(t=>t.yt).filter(Boolean));
+function ytId(u){const m=u.match(/(?:youtu\.be\/|[?&]v=|\/shorts\/)([A-Za-z0-9_-]{11})/);return m&&/youtu/.test(u)?m[1]:null}
+// Song name for a YouTube/SoundCloud/etc link, tidied up to work as a Spotify search.
+async function linkTitle(u){
+  let j=null;const v=ytId(u);
+  const tries=v?["https://www.youtube.com/oembed?format=json&url="+encodeURIComponent("https://www.youtube.com/watch?v="+v),
+                 "https://noembed.com/embed?url="+encodeURIComponent("https://www.youtube.com/watch?v="+v)]
+               :["https://noembed.com/embed?url="+encodeURIComponent(u)];
+  for(const t of tries){try{const r=await fetch(t);if(r.ok){const x=await r.json();if(x&&x.title){j=x;break}}}catch(e){}}
+  if(!j)return null;
+  let t=j.title.replace(/\s*[\(\[][^\)\]]*(official|video|audio|lyric|visuali[sz]er|hd|hq|4k|remaster|m\/v|mv)[^\)\]]*[\)\]]/gi,"")
+               .replace(/\s*\|.*$/,"").replace(/\s+(official\s+)?(music\s+)?video$/i,"").replace(/\s{2,}/g," ").trim();
+  const author=(j.author_name||"").replace(/\s*-\s*Topic$/i,"").replace(/VEVO$/i,"").trim();
+  // YouTube Music uploads ("Artist - Topic") have just the song name as the title
+  if(/ - Topic$/i.test(j.author_name||"")||(author&&!/ [-–—] /.test(t)&&!t.toLowerCase().includes(author.toLowerCase())))t=author+" - "+t;
+  return t;
 }
 async function title(id){
   try{const r=await fetch("https://open.spotify.com/oembed?url=https://open.spotify.com/track/"+id);if(!r.ok)return null;const j=await r.json();return j.title||null}catch(e){return null}
@@ -631,10 +650,23 @@ async function runCatch(f){
   }
   if(short.size)h+=`<p class="mhead">Short spotify.link links, not checked (${short.size})</p><ul class="mlist">`+[...short].map(([u,v])=>`<li><span class="mt">${esc(u)}</span><span class="md">Shared ${esc(v.date||"")} · open it to see the song</span><a href="${esc(u)}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
   if(albums.size)h+=`<p class="mhead">Albums and playlists shared (${albums.size})</p><ul class="mlist">`+[...albums].map(([u,v])=>`<li><span class="mt">${v.kind==="album"?"Album":"Playlist"}</span><span class="md">Shared ${esc(v.date||"")}</span><a href="${u}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
-  if(other.size)h+=`<p class="mhead">Shared from other services (${other.size})</p><ul class="mlist">`+[...other].map(([u,v])=>`<li><span class="mt">${esc(u.replace(/^https?:\/\/(www\.)?/,"").slice(0,60))}</span><span class="md">Shared ${esc(v.date||"")} · find it on Spotify by hand</span><a href="${esc(u)}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
+  // Links from YouTube & co: drop ones the playlist already has (matched by YouTube video), show the rest
+  // with their song name and a one-tap Spotify search.
+  const otherNew=[...other].filter(([u])=>{const v=ytId(u);return !(v&&YT_IN_PL.has(v))});
+  const otherIn=other.size-otherNew.length;
+  if(other.size){
+    h+=`<p class="mhead">Shared from YouTube and other services (${otherNew.length})</p>`;
+    if(otherIn)h+=`<p class="hint" style="margin:0">${otherIn} more ${otherIn===1?"is":"are"} already in the playlist, so ${otherIn===1?"it's":"they're"} not listed.</p>`;
+    if(otherNew.length)h+=`<p class="hint" style="margin:0">These can't be copied automatically. Tap <b>Search on Spotify</b>, then add the song to the playlist from there.</p><ul class="mlist" id="olist">`+otherNew.map(([u,v],k)=>`<li data-k="${k}"><span class="mt">${esc(u.replace(/^https?:\/\/(www\.|m\.)?/,"").slice(0,60))}</span><span class="md">Shared ${esc(v.date||"")} · <a href="${esc(u)}" target="_blank" rel="noopener">open original</a></span><a class="osearch" href="https://open.spotify.com/search" target="_blank" rel="noopener" hidden>Search on Spotify ↗</a></li>`).join("")+`</ul>`;
+  }
   if(!total&&!short.size&&!other.size)h=`<p class="sub">No music links found in that file. Check it's the group's chat export.</p>`;
   else if(total&&!missing.length&&!skippedRecent)h+=`<p class="sub">Nothing missing. Every shared song is already in the playlist.</p>`;
   out.innerHTML=h;
+  otherNew.forEach(([u],k)=>{const li=out.querySelector(`#olist li[data-k="${k}"]`);if(!li)return;
+    linkTitle(u).then(q=>{const a=li.querySelector(".osearch");
+      if(q){li.querySelector(".mt").textContent=q;a.href="https://open.spotify.com/search/"+encodeURIComponent(q.replace(/ [-–—] /g," "))}
+      else{a.href="https://open.spotify.com/search"}
+      a.hidden=false})});
   if(!missing.length)return;
   const relabel=()=>{const n=live().length;
     if($("addMissing"))$("addMissing").textContent=`Add all ${n} to the playlist`;
