@@ -1,0 +1,13 @@
+name: Gemini check
+# Quick test of the tagging key; run by hand from the Actions tab.
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/gemini_check.py
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
