@@ -586,7 +586,7 @@ function parseChat(text){
     const dm=ln.match(dateRe);if(dm)date=dm[1];
     for(const m of ln.matchAll(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?track\/([A-Za-z0-9]{22})/g)) if(!found.has(m[1]))found.set(m[1],{date,line:ln});
     for(const m of ln.matchAll(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(album|playlist)\/([A-Za-z0-9]{22})/g)){const u=`https://open.spotify.com/${m[1]}/${m[2]}`;if(!albums.has(u))albums.set(u,{date,kind:m[1]})}
-    for(const m of ln.matchAll(/https?:\/\/spotify\.link\/[A-Za-z0-9]+/g)) if(!short.has(m[0]))short.set(m[0],{date});
+    for(const m of ln.matchAll(/https?:\/\/(?:spotify\.link|open\.spotify\.com\/s)\/[A-Za-z0-9]+/g)) if(!short.has(m[0]))short.set(m[0],{date});
     for(const m of ln.matchAll(/https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/(?:watch|shorts\/)\S+|youtu\.be\/\S+|music\.youtube\.com\/\S+|music\.apple\.com\/\S+|soundcloud\.com\/\S+|[a-z0-9-]+\.bandcamp\.com\/\S+|tidal\.com\/\S+|deezer\.com\/\S+)/g)){const u=m[0].replace(/[).,]+$/,"");if(!other.has(u))other.set(u,{date})}
   }
   return {found,short,other,albums};
@@ -648,7 +648,7 @@ async function runCatch(f){
   if(missing.length){
     h+=`<p class="hint" style="margin:0" id="dupNote" hidden></p><p class="hint" style="margin:0">${SPOTIFY_CLIENT_ID?"Tap Add all to put them in the playlist. You'll be asked to sign in to Spotify the first time.":"Then paste them into the playlist in the Spotify app."}</p><ul class="mlist" id="mlist">`+missing.map(m=>`<li data-id="${m.id}"><span class="mt">Loading title…</span><span class="md">Shared ${esc(m.date||"")}</span><a href="https://open.spotify.com/track/${m.id}" target="_blank" rel="noopener">Spotify ↗</a></li>`).join("")+`</ul>`;
   }
-  if(short.size)h+=`<p class="mhead">Short spotify.link links, not checked (${short.size})</p><ul class="mlist">`+[...short].map(([u,v])=>`<li><span class="mt">${esc(u)}</span><span class="md">Shared ${esc(v.date||"")} · open it to see the song</span><a href="${esc(u)}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
+  if(short.size)h+=`<p class="mhead">Short Spotify links, not checked (${short.size})</p><ul class="mlist">`+[...short].map(([u,v])=>`<li><span class="mt">${esc(u)}</span><span class="md">Shared ${esc(v.date||"")} · open it to see the song</span><a href="${esc(u)}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
   if(albums.size)h+=`<p class="mhead">Albums and playlists shared (${albums.size})</p><ul class="mlist">`+[...albums].map(([u,v])=>`<li><span class="mt">${v.kind==="album"?"Album":"Playlist"}</span><span class="md">Shared ${esc(v.date||"")}</span><a href="${u}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
   // Links from YouTube & co: drop ones the playlist already has (matched by YouTube video), show the rest
   // with their song name and a one-tap Spotify search.
