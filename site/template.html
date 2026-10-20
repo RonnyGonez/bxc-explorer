@@ -67,6 +67,10 @@ header{display:flex;flex-direction:column;gap:6px}
 body.ytmode .trk[data-noyt] .play{opacity:.3}
 body:not(.ytmode) .trk[data-yo] .play{opacity:.3}
 .tag.yo{border-color:var(--hot);color:var(--hot)}
+.alert{border:2px solid var(--hot);background:color-mix(in srgb,var(--hot) 9%,var(--card));border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.45}
+.alert a{color:var(--hot);font-weight:700}
+.ns{white-space:nowrap;cursor:pointer}
+.ns input{vertical-align:-2px;margin:0 2px 0 0;accent-color:var(--hot)}
 .yo-inline{display:none;color:var(--hot);font-weight:700}
 @media (max-width:640px){.yo-inline{display:inline}}
 .ytbox{width:100%;max-width:356px;height:200px;margin:0 auto;border-radius:12px;overflow:hidden;background:#000}
@@ -658,29 +662,41 @@ async function runCatch(f){
   let h=`<div class="bar" style="border-top:none;padding-top:0"><div class="count">${missing.length} missing<small>${total} Spotify songs shared in this export · ${total-notIn.length} already in the playlist</small></div>`;
   if(missing.length)h+=`<div class="btns">${SPOTIFY_CLIENT_ID?`<button class="btn primary" id="addMissing" type="button">Add all ${missing.length} to the playlist</button>`:""}<button class="btn${SPOTIFY_CLIENT_ID?"":" primary"}" id="copyMissing" type="button">Copy all missing links</button></div><p class="sub" id="addStatus" hidden></p>`;
   h+=`</div>`;
+  // Links from YouTube & co: drop ones the playlist already has (matched by YouTube video)
+  const otherNew=[...other].filter(([u])=>{const v=ytId(u);return !(v&&YT_IN_PL.has(v))});
+  const otherIn=other.size-otherNew.length;
+  const alertHTML=n=>`<b>Heads up:</b> ${n} ${n===1?"song":"songs"} shared from YouTube or elsewhere ${n===1?"isn't":"aren't"} in the explorer yet. Check ${n===1?"it":"each one"} on Spotify; if it's not there, it can be added as <b>YouTube only</b>. <a href="#olist">See ${n===1?"it":"them"} ↓</a>`;
+  if(otherNew.length)h+=`<div class="alert" id="ytAlert">${alertHTML(otherNew.length)}</div>`;
   if(skippedRecent)h+=`<p class="hint" style="margin:0">${skippedRecent} ${skippedRecent===1?"song was":"songs were"} copied or added from here in the last few days, so ${skippedRecent===1?"it's":"they're"} left out to avoid adding ${skippedRecent===1?"it":"them"} twice. The playlist data catches up at the next daily refresh.</p>`;
   if(missing.length){
     h+=`<p class="hint" style="margin:0" id="dupNote" hidden></p><p class="hint" style="margin:0">${SPOTIFY_CLIENT_ID?"Tap Add all to put them in the playlist. You'll be asked to sign in to Spotify the first time.":"Then paste them into the playlist in the Spotify app."}</p><ul class="mlist" id="mlist">`+missing.map(m=>`<li data-id="${m.id}"><span class="mt">Loading title…</span><span class="md">Shared ${esc(m.date||"")}</span><a href="https://open.spotify.com/track/${m.id}" target="_blank" rel="noopener">Spotify ↗</a></li>`).join("")+`</ul>`;
   }
   if(short.size)h+=`<p class="mhead">Short Spotify links, not checked (${short.size})</p><ul class="mlist">`+[...short].map(([u,v])=>`<li><span class="mt">${esc(u)}</span><span class="md">Shared ${esc(v.date||"")} · open it to see the song</span><a href="${esc(u)}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
   if(albums.size)h+=`<p class="mhead">Albums and playlists shared (${albums.size})</p><ul class="mlist">`+[...albums].map(([u,v])=>`<li><span class="mt">${v.kind==="album"?"Album":"Playlist"}</span><span class="md">Shared ${esc(v.date||"")}</span><a href="${u}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
-  // Links from YouTube & co: drop ones the playlist already has (matched by YouTube video), show the rest
-  // with their song name and a one-tap Spotify search.
-  const otherNew=[...other].filter(([u])=>{const v=ytId(u);return !(v&&YT_IN_PL.has(v))});
-  const otherIn=other.size-otherNew.length;
+  // ...and show the rest with their song name, a one-tap Spotify search and a "not on Spotify" tick.
   if(other.size){
     h+=`<p class="mhead">Shared from YouTube and other services (${otherNew.length})</p>`;
     if(otherIn)h+=`<p class="hint" style="margin:0">${otherIn} more ${otherIn===1?"is":"are"} already in the playlist, so ${otherIn===1?"it's":"they're"} not listed.</p>`;
-    if(otherNew.length)h+=`<p class="hint" style="margin:0">These can't be copied automatically. Tap <b>Search on Spotify</b>, then add the song to the playlist from there.</p><ul class="mlist" id="olist">`+otherNew.map(([u,v],k)=>`<li data-k="${k}"><span class="mt">${esc(u.replace(/^https?:\/\/(www\.|m\.)?/,"").slice(0,60))}</span><span class="md">Shared ${esc(v.date||"")} · <a href="${esc(u)}" target="_blank" rel="noopener">open original</a></span><a class="osearch" href="https://open.spotify.com/search" target="_blank" rel="noopener" hidden>Search on Spotify ↗</a></li>`).join("")+`</ul>`;
+    if(otherNew.length)h+=`<ol class="steps" style="font-size:14px"><li>Tap <b>Search on Spotify</b> for each one. If it's there, add it to the playlist from Spotify.</li><li>If it isn't, tick <b>Not on Spotify</b>.</li><li>Tap <b>Copy YouTube-only request</b> and send it to Kareem to add.</li></ol><ul class="mlist" id="olist">`+otherNew.map(([u,v],k)=>`<li data-k="${k}"><span class="mt">${esc(u.replace(/^https?:\/\/(www\.|m\.)?/,"").slice(0,60))}</span><span class="md">Shared ${esc(v.date||"")} · <a href="${esc(u)}" target="_blank" rel="noopener">open original</a> · <label class="ns"><input type="checkbox" data-k="${k}"> Not on Spotify</label></span><a class="osearch" href="https://open.spotify.com/search" target="_blank" rel="noopener" hidden>Search on Spotify ↗</a></li>`).join("")+`</ul><div class="btns"><button class="btn" id="copyYO" type="button">Copy YouTube-only request</button></div>`;
   }
   if(!total&&!short.size&&!other.size)h=`<p class="sub">No music links found in that file. Check it's the group's chat export.</p>`;
-  else if(total&&!missing.length&&!skippedRecent)h+=`<p class="sub">Nothing missing. Every shared song is already in the playlist.</p>`;
+  else if(total&&!missing.length&&!skippedRecent&&!otherNew.length)h+=`<p class="sub">Nothing missing. Every shared song is already in the playlist.</p>`;
   out.innerHTML=h;
+  const names={};let likelyIn=0;
   otherNew.forEach(([u],k)=>{const li=out.querySelector(`#olist li[data-k="${k}"]`);if(!li)return;
-    linkTitle(u).then(q=>{const a=li.querySelector(".osearch");
+    linkTitle(u).then(q=>{const a=li.querySelector(".osearch");names[k]=q;
       if(q){li.querySelector(".mt").textContent=q;a.href="https://open.spotify.com/search/"+encodeURIComponent(q.replace(/ [-–—] /g," "))}
       else{a.href="https://open.spotify.com/search"}
-      a.hidden=false})});
+      a.hidden=false;
+      // same song name as one already in the explorer? then it's probably there via Spotify
+      const song=q?q.split(/ [-–—] /).slice(-1)[0]:"";const twins=song?PL_TITLES.get(normT(song)):null;
+      if(twins&&twins.length){li.style.opacity=".6";li.querySelector(".md").insertAdjacentText("afterbegin",`Probably already in the explorer: ${twins[0].t} · ${twins[0].a} · `);
+        likelyIn++;const n=otherNew.length-likelyIn;$("ytAlert").innerHTML=alertHTML(n);if(!n)$("ytAlert").hidden=true}})});
+  if($("copyYO"))$("copyYO").onclick=()=>{
+    const ks=[...out.querySelectorAll('#olist input[type=checkbox]:checked')].map(x=>+x.dataset.k);
+    if(!ks.length){toast("Tick the songs that aren't on Spotify first",3000);return}
+    const txt="Please add these to the BXC explorer as YouTube-only songs (not on Spotify):\n"+ks.map(k=>`- ${names[k]||"(song name unknown)"}: ${otherNew[k][0]}`).join("\n");
+    try{navigator.clipboard.writeText(txt).then(()=>toast(`Copied a request for ${ks.length} ${ks.length===1?"song":"songs"}`),()=>{$("fallback").value=txt;$("fallbackBox").hidden=false;$("fallback").select()})}catch(e){}};
   if(!missing.length)return;
   const relabel=()=>{const n=live().length;
     if($("addMissing"))$("addMissing").textContent=`Add all ${n} to the playlist`;
