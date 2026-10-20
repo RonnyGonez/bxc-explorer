@@ -21,9 +21,13 @@ HERE = os.path.dirname(__file__)
 DATA = os.path.join(HERE, "..", "data")
 TRACKS = os.path.join(DATA, "tracks.json")
 PLAYLIST = os.path.join(DATA, "playlist.json")
-ENDPOINT = os.environ.get("MODELS_ENDPOINT", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions")
 # Tried in order; Google retires model names, so a 404 moves on to the next one.
-MODELS = [m for m in [os.environ.get("MODEL", "")] if m] + ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.5-flash", "gemini-2.5-flash"]
+# Tried in order. Free-tier "flash" models are often overloaded (HTTP 503), the "lite"
+# ones and Gemma much less so. A retired name (404) is dropped for the rest of the run.
+MODELS = [m for m in [os.environ.get("MODEL", "")] if m] + [
+    "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-flash-lite-latest",
+    "gemini-3.1-flash-lite", "gemma-4-26b-a4b-it", "gemini-3.8-flash"]
+GEMINI = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 TOKEN = os.environ.get("GEMINI_API_KEY", "")
 BATCH = 20
 
@@ -70,13 +74,14 @@ def ask(batch, examples):
                 MODELS.remove(model)
                 MODELS.insert(0, model)
             return out
-        except urllib.error.HTTPError as e:
-            if e.code not in (404, 429, 500, 503):
+        except (urllib.error.HTTPError, RuntimeError, TimeoutError, OSError) as e:
+            code = getattr(e, "code", None)
+            if isinstance(e, urllib.error.HTTPError) and code not in (404, 429, 500, 503):
                 raise
             last = e
-            tried.append(f"{model}: HTTP {e.code}")
-            print(f"Model {model} gave HTTP {e.code}, trying the next one", file=sys.stderr)
-            if e.code == 404:
+            tried.append(f"{model}: {'HTTP ' + str(code) if code else type(e).__name__}")
+            print(f"Model {model} failed ({e}), trying the next one", file=sys.stderr)
+            if code == 404:
                 MODELS.remove(model)    # retired name: don't try it again
     raise RuntimeError("no Gemini model answered (" + "; ".join(tried) + ")") if tried else (last or RuntimeError("no Gemini model available"))
 
@@ -87,19 +92,21 @@ def ask_model(model, batch, examples):
     user = ("Examples of correctly tagged tracks from this playlist:\n" + json.dumps(shots, ensure_ascii=False) +
             "\n\nTag these tracks the same way:\n" +
             json.dumps([{"id": t["id"], "title": t["title"], "artist": ", ".join(t["artists"]), "album": t["album"]} for t in batch], ensure_ascii=False))
-    body = {"model": model, "temperature": 0.2, "response_format": {"type": "json_object"},
-            "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]}
-    req = urllib.request.Request(ENDPOINT, data=json.dumps(body).encode(), method="POST", headers={
-        "Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json", "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=120) as r:
+    gemma = model.startswith("gemma")
+    body = {"contents": [{"role": "user", "parts": [{"text": (SYSTEM + "\n\n" + user) if gemma else user}]}],
+            "generationConfig": {"temperature": 0.2, **({} if gemma else {"responseMimeType": "application/json"})}}
+    if not gemma:   # Gemma models don't take a separate system instruction or JSON mode
+        body["systemInstruction"] = {"parts": [{"text": SYSTEM}]}
+    req = urllib.request.Request(GEMINI.format(model=model), data=json.dumps(body).encode(), method="POST",
+                                 headers={"x-goog-api-key": TOKEN, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=180) as r:
         raw = r.read().decode("utf-8", "replace")
-        info = f"HTTP {r.status} {r.headers.get('Content-Type')} from {r.geturl()}"
     try:
-        content = json.loads(raw)["choices"][0]["message"]["content"]
+        content = "".join(p.get("text", "") for p in json.loads(raw)["candidates"][0]["content"]["parts"])
+        m = re.search(r"\{.*\}", content, re.S)
+        return json.loads(m.group(0))["tracks"]
     except Exception as e:
-        raise RuntimeError(f"{info}; couldn't read reply ({e}); body starts: {raw[:300]!r}")
-    m = re.search(r"\{.*\}", content, re.S)
-    return json.loads(m.group(0))["tracks"]
+        raise RuntimeError(f"{model}: couldn't read reply ({type(e).__name__}: {e}); starts: {raw[:300]!r}")
 
 
 def clamp(x, lo=1, hi=5):
@@ -125,7 +132,29 @@ def self_check(tracks):
         print("::warning title=Tagging check failed::" + detail.replace("\n", " ")[:500])
 
 
+def check(n=BATCH):
+    """Tag a real-size batch of already-tagged songs (nothing saved) and compare with their tags."""
+    tracks = json.load(open(TRACKS, encoding="utf-8"))
+    known = [t for t in tracks if not t.get("pending") and not t["lc"]]
+    random.seed()
+    probe, examples = random.sample(known, n), random.sample(known, 24)
+    batch = [{"id": t["id"], "title": t["t"], "artists": [t["a"]], "album": ""} for t in probe]
+    t0 = time.time()
+    try:
+        out = ask(batch, examples)
+    except Exception as e:
+        print("::warning title=Tagging test failed::" + str(e).replace("\n", " ")[:700]); return
+    got = {o.get("id"): o for o in out if isinstance(o, dict)}
+    hit = [t for t in probe if t["id"] in got]
+    close = sum(1 for t in hit if abs(clamp(got[t["id"]].get("e")) - t["e"]) <= 1)
+    genre = sum(1 for t in hit if set(got[t["id"]].get("g") or []) & set(t["g"]))
+    print(f"::notice title=Tagging test::{MODELS[0]} tagged {len(hit)}/{n} songs in {time.time()-t0:.0f}s; "
+          f"energy within 1 of the hand tags for {close}/{len(hit)}, genre overlap for {genre}/{len(hit)}")
+
+
 def main():
+    if "--check" in sys.argv:
+        return check()
     tracks = json.load(open(TRACKS, encoding="utf-8"))
     playlist = json.load(open(PLAYLIST, encoding="utf-8"))["tracks"]
     by_id = {t["id"]: t for t in tracks}
