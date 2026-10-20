@@ -65,6 +65,10 @@ header{display:flex;flex-direction:column;gap:6px}
 .src button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 .src button:focus-visible{outline:3px solid var(--sun);outline-offset:-3px}
 body.ytmode .trk[data-noyt] .play{opacity:.3}
+body:not(.ytmode) .trk[data-yo] .play{opacity:.3}
+.tag.yo{border-color:var(--hot);color:var(--hot)}
+.yo-inline{display:none;color:var(--hot);font-weight:700}
+@media (max-width:640px){.yo-inline{display:inline}}
 .ytbox{width:100%;max-width:356px;height:200px;margin:0 auto;border-radius:12px;overflow:hidden;background:#000}
 .ytbox iframe{display:block;width:100%;height:100%}
 body.docked.ytmode .wrap{padding-bottom:330px}
@@ -324,7 +328,7 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
   <details class="catch about">
     <summary>How this works</summary>
     <p><b>Playing:</b> songs play in the player at the bottom of the screen and move on by themselves. On a computer, sign in at open.spotify.com in the same browser to hear full songs; otherwise Spotify plays 30-second previews. Or tap <b>Play full songs here</b> once and sign in with Spotify: from then on everything plays in full, right in this page, one song after another (needs Spotify Premium). On iPhone, keep the screen on; if it has to be locked, use <b>Play these in the Spotify app</b> instead.</p>
-    <p><b>Spotify or YouTube:</b> the Spotify | YouTube switch picks where songs play from. YouTube plays full songs for everyone, no account needed, one after another; keep the screen on while it plays. Songs YouTube doesn't have yet are greyed out and get skipped.</p>
+    <p><b>Spotify or YouTube:</b> the Spotify | YouTube switch picks where songs play from. YouTube plays full songs for everyone, no account needed, one after another; keep the screen on while it plays. Songs YouTube doesn't have yet are greyed out and get skipped. A few songs shared in the chat aren't on Spotify at all; they're marked <b>YouTube only</b> and play in YouTube mode.</p>
     <p><b>Spotify ↗:</b> opens a single song in the Spotify app.</p>
     <p><b>Copy as playlist:</b> copies the links for the songs on screen. On a computer, paste them into an empty playlist in the Spotify app and they all drop in.</p>
     <p><b>Tags:</b> energy, mood and genre are judgement calls, not Spotify data. Songs marked <span class="guess">~</span> were harder to place.</p>
@@ -439,12 +443,12 @@ function update(reshuffle){
   $("shuffle").textContent=S.mode==="all"?"Shuffle 12":"Shuffle again";$("mShuffle").textContent=$("shuffle").textContent;
   const ul=$("list");
   if(!f.length){ul.innerHTML=`<li class="empty">Nothing fits all of those picks. Try clearing a genre or era.</li>`}
-  else ul.innerHTML=S.shown.map((t,k)=>`<li class="trk${P.q[P.i]&&P.q[P.i].id===t.id?" now":""}" data-id="${t.id}"${t.yt?"":" data-noyt"}>
+  else ul.innerHTML=S.shown.map((t,k)=>`<li class="trk${P.q[P.i]&&P.q[P.i].id===t.id?" now":""}" data-id="${t.id}"${t.yt?"":" data-noyt"}${t.yo?" data-yo":""}>
     <span class="t">${esc(t.t)}</span>
-    <span class="a">${esc(t.a)}${t.y?" · "+t.y:""}</span>
-    <span class="meta">${t.pending?"":`<span class="meter" title="Energy ${t.e} of 5">${[1,2,3,4,5].map(i=>`<i class="${i<=t.e?"on":""}" style="height:${3+i*2}px"></i>`).join("")}</span>`}${t.g.map(g=>`<span class="tag">${G[g]}</span>`).join("")}${t.pending?'<span class="tag">New · tags coming</span>':t.lc?'<span class="guess" title="Harder to place, tags are a best guess">~</span>':""}</span>
+    <span class="a">${esc(t.a)}${t.y?" · "+t.y:""}${t.yo?'<span class="yo-inline"> · YouTube only</span>':""}</span>
+    <span class="meta">${t.yo?'<span class="tag yo">YouTube only</span>':""}${t.pending?"":`<span class="meter" title="Energy ${t.e} of 5">${[1,2,3,4,5].map(i=>`<i class="${i<=t.e?"on":""}" style="height:${3+i*2}px"></i>`).join("")}</span>`}${t.g.map(g=>`<span class="tag">${G[g]}</span>`).join("")}${t.pending?'<span class="tag">New · tags coming</span>':t.lc?'<span class="guess" title="Harder to place, tags are a best guess">~</span>':""}</span>
     <button class="play" type="button" data-i="${k}" aria-label="Play ${esc(t.t)}"><svg viewBox="0 0 16 16"><path d="M3 1.5v13l11-6.5z"/></svg></button>
-    <a class="ext" href="https://open.spotify.com/track/${t.id}" target="_blank" rel="noopener">Spotify ↗</a>
+    ${t.yo?`<a class="ext" href="https://youtu.be/${t.yt}" target="_blank" rel="noopener">YouTube ↗</a>`:`<a class="ext" href="https://open.spotify.com/track/${t.id}" target="_blank" rel="noopener">Spotify ↗</a>`}
   </li>`).join("");
   $("more").hidden=S.shown.length>=S.pool.length;
   $("fallbackBox").hidden=true;
@@ -467,10 +471,12 @@ $("showall").onclick=()=>{S.mode="all";S.limit=100000;update(true)};
 $("more").onclick=()=>{S.limit+=12;update(false)};
 let qt;$("q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.value.trim().toLowerCase();update(true)},150)};
 $("copy").onclick=()=>{
-  const txt=S.shown.map(t=>"https://open.spotify.com/track/"+t.id).join("\n");
-  if(!S.shown.length){toast("No tracks to copy");return}
+  const sp=S.shown.filter(t=>!t.yo),skipped=S.shown.length-sp.length;
+  const txt=sp.map(t=>"https://open.spotify.com/track/"+t.id).join("\n");
+  if(!sp.length){toast(S.shown.length?"These are YouTube only, so there's nothing to copy for Spotify":"No tracks to copy");return}
+  if(skipped)setTimeout(()=>toast(`Left out ${skipped} YouTube-only ${skipped===1?"song":"songs"}`,3000),2300);
   const fb=()=>{$("fallback").value=txt;$("fallbackBox").hidden=false;$("fallback").focus();$("fallback").select()};
-  try{navigator.clipboard.writeText(txt).then(()=>toast(`Copied ${S.shown.length} links`),fb)}catch(e){fb()}
+  try{navigator.clipboard.writeText(txt).then(()=>toast(`Copied ${sp.length} links`),fb)}catch(e){fb()}
 };
 // ---- In-page queue player (Spotify iFrame API) ----
 const P={api:null,ctl:null,q:[],i:0,lastPos:0,dur:0,playing:false,advancing:false,pendingStart:null};
@@ -486,6 +492,11 @@ function load(i){
 function start(q,i){
   if(!q.length)return;
   if(SRC==="yt"){ytStart(q,i);return}
+  if(q.some(t=>t.yo)){              // Spotify can't play YouTube-only songs: leave them out
+    let k=i;while(k<q.length&&q[k].yo)k++;
+    const sq=q.filter(t=>!t.yo);if(!sq.length){toast("These are YouTube only. Switch to YouTube to hear them.",4000);return}
+    i=k<q.length?sq.indexOf(q[k]):0;q=sq;
+  }
   $("ytbox").hidden=true;try{Y.player&&Y.ready&&Y.player.pauseVideo()}catch(e){}$("playApp").hidden=!SPOTIFY_CLIENT_ID;
   if(sdkOn()){sdkStart(q,i);return}
   P.mode="embed";$("embed").classList.remove("off");$("pause").hidden=true;setHereBtn();
@@ -513,7 +524,10 @@ const PHONE=window.matchMedia("(max-width:640px)");
 $("list").addEventListener("click",e=>{
   let b=e.target.closest("button.play");
   if(!b&&PHONE.matches&&!e.target.closest("a")){const li=e.target.closest(".trk");if(li)b=li.querySelector("button.play")}
-  if(!b)return;start(S.shown,+b.dataset.i)});
+  if(!b)return;
+  const t=S.shown[+b.dataset.i];
+  if(t&&t.yo&&SRC!=="yt"){toast("This one's YouTube only. Switch to YouTube (next to the search box) to hear it.",4500);return}
+  start(S.shown,+b.dataset.i)});
 function closeMenu(){$("moreMenu").hidden=true;$("moreBtn").setAttribute("aria-expanded","false")}
 $("moreBtn").onclick=e=>{e.stopPropagation();const m=$("moreMenu");m.hidden=!m.hidden;$("moreBtn").setAttribute("aria-expanded",String(!m.hidden))};
 document.addEventListener("click",e=>{if(!e.target.closest("#moreMenu,#moreBtn"))closeMenu()});

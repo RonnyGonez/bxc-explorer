@@ -157,6 +157,10 @@ def main():
         return check()
     tracks = json.load(open(TRACKS, encoding="utf-8"))
     playlist = json.load(open(PLAYLIST, encoding="utf-8"))["tracks"]
+    yo_path = os.path.join(DATA, "youtube_only.json")
+    if os.path.exists(yo_path):   # songs shared from YouTube that aren't on Spotify
+        playlist = playlist + [{"id": "yt-" + e["yt"], "title": e["title"], "artists": [e["artist"]], "album": ""}
+                               for e in json.load(open(yo_path, encoding="utf-8"))]
     by_id = {t["id"]: t for t in tracks}
     todo = [p for p in playlist if p["id"] not in by_id or by_id[p["id"]].get("pending")]
     print(f"{len(todo)} tracks need tagging")
