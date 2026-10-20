@@ -10,7 +10,7 @@ on:
   workflow_dispatch:           # adds a "Run workflow" button for a manual refresh
   push:
     branches: [main]
-    paths: ["site/**", "scripts/build.py", "data/tracks.json", "data/youtube_overrides.json"]
+    paths: ["site/**", "scripts/build.py", "data/tracks.json", "data/youtube_overrides.json", "data/youtube_only.json"]
 
 permissions:
   contents: write   # save new tags back to the repo
