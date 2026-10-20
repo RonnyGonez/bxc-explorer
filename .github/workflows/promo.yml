@@ -22,6 +22,6 @@ jobs:
           git init -q -b promo
           git config user.name "playlist-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add raw.webm steps.json
+          git add raw.mp4 steps.json
           git commit -q -m "Promo recording"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" promo

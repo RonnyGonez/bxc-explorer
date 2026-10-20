@@ -1,7 +1,10 @@
 """Record a phone-sized run-through of the live explorer for a short promo video.
 
-Writes promo/raw.webm and promo/steps.json (when each step starts, in seconds).
+Captures sharp frames straight from the browser (at 3x, like a real phone screen) and
+writes promo/raw.mp4 plus promo/steps.json (when each step starts, in seconds).
 """
+import base64
+import subprocess
 import json
 import os
 import shutil
@@ -16,9 +19,17 @@ os.makedirs(OUT, exist_ok=True)
 with sync_playwright() as p:
     b = p.chromium.launch(args=["--autoplay-policy=no-user-gesture-required"])
     ctx = b.new_context(viewport={"width": 390, "height": 693}, device_scale_factor=3, is_mobile=True, has_touch=True,
-                        user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
-                        record_video_dir=OUT, record_video_size={"width": 1080, "height": 1920})
+                        user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1")
     pg = ctx.new_page()
+    frames = []
+    cdp = ctx.new_cdp_session(pg)
+
+    def on_frame(ev):
+        frames.append((ev["metadata"]["timestamp"], ev["data"]))
+        cdp.send("Page.screencastFrameAck", {"sessionId": ev["sessionId"]})
+
+    cdp.on("Page.screencastFrame", on_frame)
+    cdp.send("Page.startScreencast", {"format": "jpeg", "quality": 88, "maxWidth": 1170, "maxHeight": 2079})
     t0 = time.time()
     steps = []
     mark = lambda name: steps.append({"step": name, "t": round(time.time() - t0, 2)})
@@ -47,9 +58,30 @@ with sync_playwright() as p:
     pg.wait_for_timeout(5500)
     mark("end")
     pg.wait_for_timeout(300)
-    video = pg.video.path()
+    cdp.send("Page.stopScreencast")
     ctx.close()
     b.close()
-shutil.move(video, os.path.join(OUT, "raw.webm"))
+
+# Turn the frames (sent only when the screen changes) into a steady 30fps video.
+fdir = os.path.join(OUT, "frames")
+shutil.rmtree(fdir, ignore_errors=True)
+os.makedirs(fdir)
+lines = []
+start = frames[0][0]
+# screencast timestamps are wall-clock seconds; make step times relative to the first frame
+steps = [dict(s, t=round(s["t"] - (start - t0), 2)) for s in steps]
+for k, (ts, data) in enumerate(frames):
+    name = f"{k:05d}.jpg"
+    open(os.path.join(fdir, name), "wb").write(base64.b64decode(data))
+    dur = (frames[k + 1][0] - ts) if k + 1 < len(frames) else 0.5
+    lines += [f"file 'frames/{name}'", f"duration {max(dur, 0.001):.4f}"]
+lines.append(f"file 'frames/{len(frames) - 1:05d}.jpg'")
+open(os.path.join(OUT, "frames.txt"), "w").write("\n".join(lines) + "\n")
+subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", "frames.txt",
+                "-vf", "fps=30,scale=1080:1920:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-crf", "18", "raw.mp4"],
+               cwd=OUT, check=True)
+shutil.rmtree(fdir)
+os.remove(os.path.join(OUT, "frames.txt"))
+
 json.dump(steps, open(os.path.join(OUT, "steps.json"), "w"), indent=1)
 print(steps)
