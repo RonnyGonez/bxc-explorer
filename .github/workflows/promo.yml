@@ -13,9 +13,11 @@ jobs:
         with:
           python-version: "3.12"
       - run: |
+          sudo apt-get install -y -qq ffmpeg >/dev/null
           pip install playwright
           python -m playwright install --with-deps chromium
-      - run: python scripts/promo.py
+      - run: |
+          python scripts/promo.py 2>err.txt || { echo "::error title=Promo failed::$(tail -c 900 err.txt | tr '\n' ' ')"; exit 1; }
       - name: Save to the promo branch
         run: |
           cd promo

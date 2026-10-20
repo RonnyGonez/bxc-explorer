@@ -26,7 +26,10 @@ with sync_playwright() as p:
 
     def on_frame(ev):
         frames.append((ev["metadata"]["timestamp"], ev["data"]))
-        cdp.send("Page.screencastFrameAck", {"sessionId": ev["sessionId"]})
+        try:
+            cdp.send("Page.screencastFrameAck", {"sessionId": ev["sessionId"]})
+        except Exception:
+            pass
 
     cdp.on("Page.screencastFrame", on_frame)
     cdp.send("Page.startScreencast", {"format": "jpeg", "quality": 88, "maxWidth": 1170, "maxHeight": 2079})
