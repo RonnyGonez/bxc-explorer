@@ -1,6 +1,6 @@
 {
  "playlist_id": "2YOQqyCK4VP8Owz1TF7sNB",
- "count": 782,
+ "count": 798,
  "tracks": [
   {
    "id": "3B9EjHN1rHhdiispaf9eRG",
@@ -6406,6 +6406,139 @@
     "Caetano Veloso"
    ],
    "album": "Qualquer Coisa"
+  },
+  {
+   "id": "53aVMHWjpz7gB2wGtAv3lD",
+   "title": "The Call Of Ktulu - Remastered",
+   "artists": [
+    "Metallica"
+   ],
+   "album": "Ride The Lightning (Remastered)"
+  },
+  {
+   "id": "2CQQrFEuqxQBnzC3SxEl9m",
+   "title": "Good As Gold (Stupid As Mud)",
+   "artists": [
+    "The Beautiful South"
+   ],
+   "album": "Carry On Up The Charts"
+  },
+  {
+   "id": "2hDhDcWn2yhsNqxtiEdEuv",
+   "title": "Think For A Minute",
+   "artists": [
+    "The Housemartins"
+   ],
+   "album": "London 0 Hull 4"
+  },
+  {
+   "id": "6WcTybqG4lDxrpNDzdBISL",
+   "title": "Turquoise",
+   "artists": [
+    "Donovan"
+   ],
+   "album": "Fairytale (Deluxe Expanded Edition)"
+  },
+  {
+   "id": "6xE6ZWzK1YDDSYzqOCoQlz",
+   "title": "Last Train to London",
+   "artists": [
+    "Electric Light Orchestra"
+   ],
+   "album": "Discovery"
+  },
+  {
+   "id": "4dBI72rgkmG0gTzswyBTzz",
+   "title": "Sweet Thing - 1999 Remaster",
+   "artists": [
+    "Van Morrison"
+   ],
+   "album": "Astral Weeks"
+  },
+  {
+   "id": "5hyRrd5BoYapoY2mTRsnHV",
+   "title": "Book Of Saturday",
+   "artists": [
+    "King Crimson"
+   ],
+   "album": "Larks' Tongues In Aspic (Expanded & Remastered Original Album Mix)"
+  },
+  {
+   "id": "1N4MKISvC1ddfRCRQDXDd2",
+   "title": "Madame George - 1999 Remaster",
+   "artists": [
+    "Van Morrison"
+   ],
+   "album": "Astral Weeks"
+  },
+  {
+   "id": "0GTK6TesV108Jj5D3MHsYb",
+   "title": "Owner of a Lonely Heart",
+   "artists": [
+    "Yes"
+   ],
+   "album": "90125 (Deluxe Version)"
+  },
+  {
+   "id": "1WBo4U3SnPN49I5lOESmYk",
+   "title": "Close to the Edge: i. The Solid Time of Change, ii. Total Mass Retain, iii. I Get up I Get Down, iv. Seasons of Man - 2025 Remaster",
+   "artists": [
+    "Yes"
+   ],
+   "album": "Close to the Edge (Super Deluxe Edition)"
+  },
+  {
+   "id": "3MubLrfaCK0V5g9SjOhe7l",
+   "title": "Starship Trooper: Life Seeker / Disillusion / Würm - 2023 Remaster",
+   "artists": [
+    "Yes"
+   ],
+   "album": "The Yes Album (Super Deluxe Edition)"
+  },
+  {
+   "id": "2xGMzDlPnmPHD8HUYOy4Lw",
+   "title": "Let's All Chant",
+   "artists": [
+    "The Michael Zager Band"
+   ],
+   "album": "Let's All Chant"
+  },
+  {
+   "id": "1zGscdwy4qUoMhzntNh5mQ",
+   "title": "You Can't Turn Me Away",
+   "artists": [
+    "Sylvia Striplin"
+   ],
+   "album": "Give Me Your Love"
+  },
+  {
+   "id": "6lqYjlQyDzNWE0MGc78b4c",
+   "title": "Mysterious Vibes",
+   "artists": [
+    "The Blackbyrds"
+   ],
+   "album": "Action"
+  },
+  {
+   "id": "1xicvSO4CJ2ymqYgpk7DFh",
+   "title": "Milestones (feat. John Coltrane, Cannonball Adderley, Red Garland, Paul Chambers & Philly Joe Jones)",
+   "artists": [
+    "Miles Davis",
+    "John Coltrane",
+    "Cannonball Adderley",
+    "Red Garland",
+    "Paul Chambers",
+    "Philly Joe Jones"
+   ],
+   "album": "Milestones"
+  },
+  {
+   "id": "3DeEFazhlZL5GfAPQsv8jT",
+   "title": "My Blueberry Life - Demo",
+   "artists": [
+    "Current Joys"
+   ],
+   "album": "B-Sides, Rarities and Demos"
   }
  ]
 }
