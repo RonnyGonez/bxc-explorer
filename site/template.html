@@ -589,10 +589,17 @@ function ytLoad(k){
       onReady:e=>{Y.ready=true;try{e.target.getIframe().referrerPolicy="strict-origin-when-cross-origin"}catch(err){}const want=P.q[P.i]&&P.q[P.i].yt;if(want&&want!==vid)e.target.loadVideoById(want);else e.target.playVideo()},
       onStateChange:e=>{
         if(e.data===YT.PlayerState.ENDED)ytLoad(P.i+1);
-        else if(e.data===YT.PlayerState.PLAYING){pauseLbl(false);appMsg("")}
+        else if(e.data===YT.PlayerState.PLAYING){pauseLbl(false);appMsg("");Y.errs=0}
         else if(e.data===YT.PlayerState.PAUSED)pauseLbl(true);
       },
-      onError:e=>{toast(`That video won't play here (YouTube error ${e&&e.data}), skipping`,3000);setTimeout(()=>ytLoad(P.i+1),600)}
+      onError:e=>{
+        Y.errs=(Y.errs||0)+1;
+        if(Y.errs>=3){   // several in a row = YouTube is blocking this browser (e.g. its "not a bot" check), not one bad video
+          Y.errs=0;const v=P.q[P.i]&&P.q[P.i].yt;
+          appMsg("");$("appStatus").hidden=false;
+          $("appStatus").innerHTML=`YouTube is blocking playback in this browser, often with a "sign in to confirm you're not a bot" check. Sign in at <a href="https://www.youtube.com" target="_blank" rel="noopener">youtube.com</a> in this browser (or turn off any VPN), then tap ⏯. ${v?`<a href="https://youtu.be/${v}" target="_blank" rel="noopener">Open this song on YouTube ↗</a>`:""}`;
+          return}
+        toast(`That video won't play here (YouTube error ${e&&e.data}), skipping`,3000);setTimeout(()=>ytLoad(P.i+1),600)}
     }});
   setTimeout(()=>{try{if(P.mode==="yt"&&Y.player.getPlayerState()!==1)appMsg("If nothing's playing, tap the video once. Phones want one tap the first time.")}catch(e){}},5000);
 }
@@ -848,7 +855,7 @@ function sdkStart(q,i){
     if(q.length-base>100)appMsg("Playing the next 100 songs. Tap ▶ on a later song to carry on past that.");
   })();
 }
-$("pause").onclick=()=>{if(P.mode==="yt"){if(Y.player&&Y.ready){Y.player.getPlayerState()===1?Y.player.pauseVideo():Y.player.playVideo()}return}
+$("pause").onclick=()=>{if(P.mode==="yt"){if(Y.player&&Y.ready){const st=Y.player.getPlayerState();if(st===1)Y.player.pauseVideo();else if(!$("appStatus").hidden&&$("appStatus").querySelector("a")){appMsg("");ytLoad(P.i)}else Y.player.playVideo()}return}
   if(!SDK.player)return;SDK.player.activateElement();if(P.mode!=="sdk")return;if(!SDK.deviceId){sdkStart(P.q,P.i);return}
   SDK.player.getCurrentState().then(st=>{if(st)SDK.player.togglePlay();else sdkStart(P.q,P.i)})};
 
